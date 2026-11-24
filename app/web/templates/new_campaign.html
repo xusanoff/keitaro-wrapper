@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}New campaign · Keitaro Wrapper{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>New campaign</h1>
+    <p>Visitors from the chosen country go to Google. Everyone else goes to the offer.</p>
+  </div>
+</div>
+
+<div class="create-grid">
+  <form class="panel" id="create-form" novalidate>
+    <div class="panel-body">
+      <label class="field" for="f-name">
+        <span>Name</span>
+        <div class="prefixed">
+          <span class="prefix">{{ prefix }}</span>
+          <input type="text" id="f-name" name="name" autocomplete="off" placeholder="mx_promo_1" required maxlength="180">
+        </div>
+        <small>The prefix is added automatically.</small>
+      </label>
+
+      <div class="geo-row">
+        <label class="field" for="f-geo">
+          <span>Geo</span>
+          <input type="text" id="f-geo" name="geo" class="geo-input" maxlength="2" placeholder="MX" autocomplete="off" required>
+        </label>
+        <div class="geo-name" id="geo-name">ISO-2 country code, e.g. MX, AU, RO</div>
+      </div>
+
+      <div class="field">
+        <span id="offer-label">Offer</span>
+        <div class="ac" id="offer-ac" data-label="offer-label" data-placeholder="Search by name or ID"></div>
+        <small class="ac-picked" id="offer-picked">Nothing selected</small>
+      </div>
+
+      <div class="row-3">
+        <label class="field" for="f-domain"><span>Domain</span><select id="f-domain" disabled><option>Loading…</option></select></label>
+        <label class="field" for="f-group"><span>Group</span><select id="f-group" disabled><option>Loading…</option></select></label>
+        <label class="field" for="f-source"><span>Traffic source</span><select id="f-source" disabled><option>Loading…</option></select></label>
+      </div>
+
+      <div id="form-error" hidden></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" id="create-btn">Create</button>
+        <span class="muted" id="form-hint"></span>
+      </div>
+    </div>
+  </form>
+
+  <div class="stack" style="display:grid;gap:20px">
+    <section class="panel route" aria-labelledby="route-h">
+      <h2 id="route-h">Streams that will be created</h2>
+      <div class="route-entry">visitor → <b id="r-name">{{ prefix }}…</b></div>
+      <div class="rule">
+        <span class="rule-pos">1</span>
+        <div class="rule-card">
+          <span class="when">Country is <span class="chip" id="r-geo">??</span></span>
+          <span class="then">Redirect to https://google.com</span>
+        </div>
+      </div>
+      <div class="rule">
+        <span class="rule-pos">2</span>
+        <div class="rule-card">
+          <span class="when">Everyone else</span>
+          <span class="then" id="r-offer">Offer not selected</span>
+          <span class="muted num" style="font-size:13px">weight 100%</span>
+        </div>
+      </div>
+    </section>
+    <div id="result"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>KW.initCreatePage({{ prefix|tojson }});</script>{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Edit campaign · Keitaro Wrapper{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Edit campaign</h1>
+    <p>Changes stay in a draft until you press Push on the stream.</p>
+  </div>
+</div>
+
+<form class="panel" id="picker-form">
+  <div class="panel-body picker">
+    <label class="field" for="campaign-select">
+      <span>Campaign</span>
+      <select id="campaign-select" disabled><option>Loading campaigns…</option></select>
+    </label>
+    <button class="btn btn-primary" id="fetch-btn" type="submit" disabled>Fetch streams</button>
+  </div>
+</form>
+
+<div id="fetch-msg"></div>
+<section id="campaign" aria-live="polite"></section>
+{% endblock %}
+{% block scripts %}<script>KW.initEditorPage({{ campaign_id|tojson }});</script>{% endblock %}

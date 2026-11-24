@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,6 +89,13 @@ class SyncOut(BaseModel):
     offers_marked_removed: int
 
 
+def _utc(dt: datetime | None) -> datetime | None:
+    """SQLite drops tzinfo; values are always stored in UTC."""
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
 def stream_out(stream: Stream) -> StreamOut:
     return StreamOut(
         id=stream.id,
@@ -98,7 +105,7 @@ def stream_out(stream: Stream) -> StreamOut:
         has_offers=stream.has_offers,
         is_dirty=stream.is_dirty,
         problem=stream_problem(stream),
-        synced_at=stream.synced_at,
+        synced_at=_utc(stream.synced_at),
         offers=[
             LinkOut(
                 id=link.id,
@@ -125,7 +132,7 @@ def campaign_out(campaign: Campaign, keitaro_url: str) -> CampaignOut:
         keitaro_id=campaign.keitaro_id,
         name=campaign.name,
         geo=campaign.geo,
-        synced_at=campaign.synced_at,
+        synced_at=_utc(campaign.synced_at),
         keitaro_url=keitaro_url,
         streams=[stream_out(s) for s in sorted(campaign.streams, key=lambda s: (s.position, s.keitaro_id))],
     )
