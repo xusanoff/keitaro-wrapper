@@ -100,6 +100,9 @@ Keitaro в тестах замокан через `respx` (`tests/fake_keitaro.p
 ### Создание кампании
 Префикс `test_tadjibayev_` добавляется на бэкенде, если его нет. GEO проверяется по списку ISO‑3166‑1 alpha‑2. Поток 1 — `type: regular`, `schema: redirect`, `action_type: http`; поток 2 — `type: default` (замыкающий), `schema: landings`. Если создание потока не удалось, кампания удаляется в Keitaro, чтобы не оставлять полусобранную.
 
+## Проверка на стенде
+Кампания `test_tadjibayev_campaign1` (#49) создана на стенде; на ней проверены Add → Push, Remove → Push (оффер ушёл из Keitaro, у нас остался `removed`), Pin 25 % + Bring back → 25/38/37 → Push, Cancel, удаление оффера прямо в Keitaro → Fetch → `removed`. После каждого Push веса в Keitaro совпадали с нашими. Реальные ответы API лежат в `docs/api_samples/`; `PUT /streams/{id}` с одним полем `offers` меняет только состав офферов, `schema`/`type`/`filters` сохраняются.
+
 ## Ограничения
 * Нет авторизации пользователей — обёртка рассчитана на локальный/внутренний запуск.
 * Каталог офферов кешируется на 60 с (`OFFERS_CACHE_TTL`).

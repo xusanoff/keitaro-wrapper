@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1813,
+    "name": "kt-emulator.test",
+    "is_ssl": true,
+    "network_status": "active",
+    "default_campaign_id": null,
+    "state": "active",
+    "created_at": "2026-11-23 09:51:55",
+    "updated_at": "2026-11-23 09:51:55",
+    "catch_not_found": false,
+    "notes": "",
+    "ssl_redirect": true,
+    "allow_indexing": false,
+    "group_id": null,
+    "status": "active"
+  }
+]

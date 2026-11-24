@@ -1,0 +1,16 @@
+[
+  {
+    "id": 836,
+    "name": "FORTESTS",
+    "postback_url": "",
+    "postback_statuses": [],
+    "template_name": "",
+    "accept_parameters": false,
+    "parameters": {},
+    "state": "active",
+    "created_at": "2026-11-23 09:51:55",
+    "updated_at": "2026-11-23 09:51:55",
+    "notes": "",
+    "traffic_loss": 0
+  }
+]
