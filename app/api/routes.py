@@ -41,7 +41,7 @@ def _items(raw: list[dict]) -> list[CatalogItem]:
 
 
 @router.get("/offers", response_model=list[CatalogItem])
-async def search_offers(keitaro: Keitaro, q: str = Query("", max_length=100), limit: int = Query(20, le=50)):
+async def search_offers(keitaro: Keitaro, q: str = Query("", max_length=100), limit: int = Query(20, ge=1, le=50)):
     return offer_svc.search(await offer_svc.catalog(keitaro), q, limit)
 
 
@@ -61,10 +61,8 @@ async def catalog(keitaro: Keitaro, cfg: Cfg):
 
 
 @router.get("/campaigns")
-async def list_campaigns(keitaro: Keitaro, cfg: Cfg, all: bool = False):
-    rows = await keitaro.list_campaigns()
-    if not all:
-        rows = [c for c in rows if str(c.get("name", "")).startswith(cfg.campaign_prefix)]
+async def list_campaigns(keitaro: Keitaro, cfg: Cfg):
+    rows = [c for c in await keitaro.list_campaigns() if str(c.get("name", "")).startswith(cfg.campaign_prefix)]
     return [{"id": c["id"], "name": c.get("name", ""), "state": c.get("state")} for c in rows]
 
 

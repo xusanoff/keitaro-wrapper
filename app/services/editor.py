@@ -12,6 +12,7 @@ from app.keitaro.client import KeitaroClient, KeitaroError
 from app.models import OfferStatus, Stream, StreamOffer
 from app.services import offers as offer_svc
 from app.services.errors import Conflict, NotFound, ServiceError
+from app.services.sync import active_signature, parse_offers, parse_share
 from app.services.weights import WeightError, WeightItem, distribute, push_problem
 
 
@@ -48,6 +49,7 @@ async def load_stream(session: AsyncSession, stream_id: int) -> Stream:
     stream = await session.scalar(
         select(Stream)
         .where(Stream.id == stream_id)
+        .with_for_update(of=Stream)  # serialize edits of one stream (no-op on SQLite)
         .options(selectinload(Stream.links).joinedload(StreamOffer.offer))
         .execution_options(populate_existing=True)
     )
@@ -149,12 +151,17 @@ async def cancel(session: AsyncSession, stream_id: int) -> Stream:
     return await _save(session, stream)
 
 
-def _offers_signature(offers: list[dict]) -> dict[int, int]:
-    return {
-        int(o["offer_id"]): int(o.get("share") or 0)
-        for o in offers
-        if o.get("state", "active") == "active"
-    }
+def _mark_published(stream: Stream, links: list[StreamOffer]) -> None:
+    for link in list(links):
+        if link.added_in_draft and link.status == OfferStatus.removed:
+            # added and removed inside one draft: Keitaro never had it, nothing to archive
+            stream.links.remove(link)
+            continue
+        link.published_share = link.share
+        link.published_status = link.status
+        link.added_in_draft = False
+    stream.is_dirty = False
+    stream.synced_at = datetime.now(UTC)
 
 
 async def push(session: AsyncSession, keitaro: KeitaroClient, stream_id: int, force: bool = False) -> Stream:
@@ -170,39 +177,49 @@ async def push(session: AsyncSession, keitaro: KeitaroClient, stream_id: int, fo
         if exc.status_code == 404:
             raise Conflict("This stream was deleted in Keitaro. Press Fetch streams.") from exc
         raise
+    remote_offers = remote.get("offers") or []
+    remote_now = active_signature(remote_offers)
+    draft = {link.offer.keitaro_id: link.share for link in links if link.status == OfferStatus.active}
+    if remote_now == draft:
+        # Keitaro already has exactly this draft (e.g. an earlier Push reached Keitaro
+        # but we failed afterwards): just record it as published.
+        _mark_published(stream, links)
+        return await _save(session, stream)
+
     published = {
         link.offer.keitaro_id: link.published_share
         for link in links
         if link.published_status == OfferStatus.active
     }
-    if not force and _offers_signature(remote.get("offers") or []) != published:
+    if not force and remote_now != published:
         raise Conflict(
             "Offers of this stream were changed in Keitaro after your last fetch. "
             "Push anyway to overwrite them, or Cancel and Fetch streams to load the new state."
         )
 
-    payload = {
-        "offers": [
-            {"offer_id": link.offer.keitaro_id, "share": link.share, "state": "active"}
-            for link in links
-            if link.status == OfferStatus.active
-        ]
-    }
-    updated = await keitaro.update_stream(stream.keitaro_id, payload)
-    remote_offers = (updated or {}).get("offers")
-    if remote_offers is None:
-        remote_offers = (await keitaro.get_stream(stream.keitaro_id)).get("offers") or []
-    expected = {o["offer_id"]: o["share"] for o in payload["offers"]}
-    if _offers_signature(remote_offers) != expected:
+    payload_offers = [
+        {"offer_id": link.offer.keitaro_id, "share": link.share, "state": "active"}
+        for link in links
+        if link.status == OfferStatus.active
+    ]
+    # Offers switched off in Keitaro (state: disabled) are not ours to delete: keep them as they are.
+    removed_here = {link.offer.keitaro_id for link in links if link.published_status == OfferStatus.active}
+    for kid, active, _ in parse_offers(remote_offers):
+        if not active and kid not in draft and kid not in removed_here:
+            original = next(o for o in remote_offers if int(o["offer_id"]) == kid)
+            payload_offers.append(
+                {"offer_id": kid, "share": parse_share(original.get("share")), "state": "disabled"}
+            )
+
+    updated = await keitaro.update_stream(stream.keitaro_id, {"offers": payload_offers})
+    after = (updated or {}).get("offers")
+    if after is None:
+        after = (await keitaro.get_stream(stream.keitaro_id)).get("offers") or []
+    if active_signature(after) != draft:
         raise ServiceError(
             "Keitaro accepted the update but returned different weights. Press Fetch streams to see the real state.",
             502,
         )
 
-    for link in links:
-        link.published_share = link.share
-        link.published_status = link.status
-        link.added_in_draft = False
-    stream.is_dirty = False
-    stream.synced_at = datetime.now(UTC)
+    _mark_published(stream, links)
     return await _save(session, stream)

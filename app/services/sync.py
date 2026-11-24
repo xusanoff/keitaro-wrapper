@@ -11,6 +11,7 @@ Rules
 * A *dirty* stream (unpushed local changes) is NOT touched; it is reported in
   ``skipped_dirty`` so the UI can ask the user to Push or Cancel first.
 * Streams deleted in Keitaro are deleted locally.
+* Only campaigns whose name starts with the configured prefix can be fetched.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ from sqlalchemy.orm import selectinload
 from app.keitaro.client import KeitaroClient, KeitaroError
 from app.models import Campaign, OfferStatus, Stream, StreamOffer
 from app.services import offers as offer_svc
-from app.services.errors import NotFound
+from app.config import get_settings
+from app.services.errors import NotFound, ServiceError
 
 
 @dataclass
@@ -37,8 +39,45 @@ class SyncReport:
     offers_marked_removed: int = 0
 
 
+OFFER_SCHEMAS = {"landings", "offers"}
+
+
 def is_offer_stream(k_stream: dict) -> bool:
-    return k_stream.get("schema") == "landings"
+    return k_stream.get("schema") in OFFER_SCHEMAS or bool(k_stream.get("offers"))
+
+
+def parse_share(value) -> int:
+    """Keitaro may send 33, 33.0 or "33"; non-integers are rounded."""
+    try:
+        return int(round(float(value or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def parse_offers(k_offers: list[dict]) -> list[tuple[int, bool, int]]:
+    """Normalize Keitaro's ``offers`` into ``(offer_id, active, share)`` in Keitaro order.
+
+    Duplicate entries of one offer are merged (active wins, shares of active entries add up),
+    so the total stays exactly what Keitaro routes.
+    """
+    merged: dict[int, list] = {}
+    for ko in k_offers or []:
+        try:
+            kid = int(ko["offer_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        active = ko.get("state", "active") == "active"
+        share = parse_share(ko.get("share")) if active else 0
+        if kid in merged:
+            merged[kid][0] = merged[kid][0] or active
+            merged[kid][1] += share
+        else:
+            merged[kid] = [active, share]
+    return [(kid, a, sh) for kid, (a, sh) in merged.items()]
+
+
+def active_signature(k_offers: list[dict]) -> dict[int, int]:
+    return {kid: sh for kid, active, sh in parse_offers(k_offers) if active}
 
 
 async def load_campaign(session: AsyncSession, keitaro_id: int) -> Campaign | None:
@@ -57,6 +96,11 @@ async def _upsert_campaign(session: AsyncSession, keitaro: KeitaroClient, keitar
         if exc.status_code == 404:
             raise NotFound(f"Campaign #{keitaro_id} not found in Keitaro") from exc
         raise
+    prefix = get_settings().campaign_prefix
+    if not str(k.get("name", "")).startswith(prefix):
+        raise ServiceError(
+            f"Campaign #{keitaro_id} is not managed by this wrapper: its name must start with {prefix}", 403
+        )
     campaign = await load_campaign(session, keitaro_id)
     if campaign is None:
         campaign = Campaign(keitaro_id=keitaro_id, name=k.get("name", ""))
@@ -76,14 +120,9 @@ def reconcile_links(stream: Stream, k_offers: list[dict], offer_by_kid: dict) ->
     seen: set[int] = set()
     added = marked = 0
     pos = 0
-    for ko in k_offers:
-        kid = int(ko["offer_id"])
-        if kid in seen:
-            continue
+    for kid, active, share in parse_offers(k_offers):
         seen.add(kid)
-        active = ko.get("state", "active") == "active"
         status = OfferStatus.active if active else OfferStatus.removed
-        share = int(ko.get("share") or 0) if active else 0
         link = existing.get(kid)
         if link is None:
             link = StreamOffer(offer=offer_by_kid[kid], offer_id=offer_by_kid[kid].id)
@@ -123,8 +162,7 @@ async def sync_campaign(session: AsyncSession, keitaro: KeitaroClient, keitaro_i
     offer_by_kid = {}
     for ks in k_streams:
         if is_offer_stream(ks):
-            for ko in ks.get("offers") or []:
-                kid = int(ko["offer_id"])
+            for kid, _, _ in parse_offers(ks.get("offers") or []):
                 if kid not in offer_by_kid:
                     offer_by_kid[kid] = await offer_svc.upsert_offer(session, kid, names.get(kid))
 
@@ -142,7 +180,7 @@ async def sync_campaign(session: AsyncSession, keitaro: KeitaroClient, keitaro_i
         stream.has_offers = is_offer_stream(ks)
 
         if not stream.has_offers:
-            stream.links.clear()
+            # Keep any offer history (archived links) in case the stream gets offers again.
             stream.is_dirty = False
             stream.synced_at = now
             continue

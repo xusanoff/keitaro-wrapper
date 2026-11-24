@@ -93,6 +93,8 @@ async def create_campaign(session: AsyncSession, keitaro: KeitaroClient, data: C
         raise ServiceError(f"Offer #{data.offer_id} does not exist in Keitaro")
 
     created = await keitaro.create_campaign(campaign_payload(data, name))
+    if not isinstance(created, dict) or "id" not in created:
+        raise KeitaroError("campaign was not created: response has no id", payload=created)
     kid = int(created["id"])
     try:
         geo_stream = await keitaro.create_stream(geo_stream_payload(kid, geo))

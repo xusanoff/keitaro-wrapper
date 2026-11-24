@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 
 from app.api.routes import router as api_router
 from app.keitaro.client import KeitaroError
@@ -26,12 +27,29 @@ async def service_error(_: Request, exc: ServiceError):
 
 @app.exception_handler(KeitaroError)
 async def keitaro_error(_: Request, exc: KeitaroError):
-    # 4xx from Keitaro = it rejected our data; anything else = upstream problem.
-    code = 422 if exc.status_code and 400 <= exc.status_code < 500 and exc.status_code != 401 else 502
-    msg = f"Keitaro rejected the request: {exc.message}" if code == 422 else str(exc)
-    if exc.status_code == 401:
-        msg = "Keitaro rejected the API key. Check KEITARO_API_KEY in .env."
+    status = exc.status_code
+    if status in (401, 403):
+        code, msg = 502, "Keitaro rejected the API key. Check KEITARO_API_KEY in .env."
+    elif status == 404:
+        code, msg = 404, "Keitaro could not find it (it may have been deleted). Press Fetch streams to reload."
+    elif status == 429:
+        code, msg = 503, "Keitaro is rate-limiting requests. Wait a few seconds and try again."
+    elif status and 400 <= status < 500:
+        code, msg = 422, f"Keitaro rejected the request: {exc.message}"
+    elif status:
+        code, msg = 502, f"Keitaro failed with error {status}. Try again in a moment."
+    else:
+        code, msg = 502, f"{exc.message}. Check KEITARO_URL and your connection."
     return JSONResponse({"detail": msg}, status_code=code)
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(_: Request, exc: IntegrityError):
+    # e.g. the same offer added twice by a double click / two tabs
+    return JSONResponse(
+        {"detail": "This change conflicts with another one made at the same time. Reload and try again."},
+        status_code=409,
+    )
 
 
 @app.exception_handler(RequestValidationError)

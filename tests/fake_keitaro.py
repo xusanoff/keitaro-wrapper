@@ -22,7 +22,7 @@ class FakeKeitaro:
         self.requests: list[tuple[str, str, dict | None]] = []
         self.fail_next: dict[str, int] = {}
         self._ids = count(500)
-        m = mock
+        m = self.mock_router = mock
         m.get(f"{BASE}/offers").mock(side_effect=lambda r: self._ok(r, self.offers))
         m.get(f"{BASE}/domains").mock(side_effect=lambda r: self._ok(r, [{"id": 1813, "name": "test.example"}]))
         m.get(f"{BASE}/groups").mock(side_effect=lambda r: self._ok(r, [{"id": 10332, "name": "FORTESTS"}]))

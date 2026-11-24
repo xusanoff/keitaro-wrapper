@@ -70,4 +70,10 @@ def push_problem(items: Sequence[WeightItem]) -> str | None:
         if all(it.pinned for it in active):
             return f"All offers are pinned and add up to {total}%. Change a pinned weight or unpin an offer so the total is 100%."
         return f"Weights add up to {total}%, not 100%."
+    zero = sum(1 for it in active if it.share == 0)
+    if zero:
+        return (
+            f"{zero} active offer(s) would get 0% of traffic. "
+            "Lower the pinned weights or remove those offers before pushing."
+        )
     return None
