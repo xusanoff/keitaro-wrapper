@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.keitaro.client import KeitaroClient, get_keitaro
+from app.models import Campaign, Stream
 from app.schemas import (
     CampaignCreate,
     CampaignCreated,
@@ -61,9 +63,17 @@ async def catalog(keitaro: Keitaro, cfg: Cfg):
 
 
 @router.get("/campaigns")
-async def list_campaigns(keitaro: Keitaro, cfg: Cfg):
+async def list_campaigns(keitaro: Keitaro, cfg: Cfg, session: Session):
     rows = [c for c in await keitaro.list_campaigns() if str(c.get("name", "")).startswith(cfg.campaign_prefix)]
-    return [{"id": c["id"], "name": c.get("name", ""), "state": c.get("state")} for c in rows]
+    drafts = set(
+        await session.scalars(
+            select(Campaign.keitaro_id).join(Stream).where(Stream.is_dirty.is_(True)).distinct()
+        )
+    )
+    return [
+        {"id": int(c["id"]), "name": str(c.get("name", "")), "state": c.get("state"), "has_draft": int(c["id"]) in drafts}
+        for c in rows
+    ]
 
 
 @router.post("/campaigns", response_model=CampaignCreated, status_code=201)

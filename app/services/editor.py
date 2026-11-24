@@ -192,8 +192,10 @@ async def push(session: AsyncSession, keitaro: KeitaroClient, stream_id: int, fo
         if link.published_status == OfferStatus.active
     }
     if not force and remote_now != published:
+        now = ", ".join(f"#{kid} {share}%" for kid, share in remote_now.items()) or "no active offers"
         raise Conflict(
             "Offers of this stream were changed in Keitaro after your last fetch. "
+            f"Keitaro now has: {now}. "
             "Push anyway to overwrite them, or Cancel and Fetch streams to load the new state."
         )
 

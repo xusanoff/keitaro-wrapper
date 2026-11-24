@@ -21,4 +21,4 @@
 <div id="fetch-msg"></div>
 <section id="campaign" aria-live="polite"></section>
 {% endblock %}
-{% block scripts %}<script>KW.initEditorPage({{ campaign_id|tojson }});</script>{% endblock %}
+{% block scripts %}<script>KW.initEditorPage({{ campaign_id|tojson }}, {{ prefix|tojson }});</script>{% endblock %}

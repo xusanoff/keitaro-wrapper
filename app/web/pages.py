@@ -18,9 +18,9 @@ async def new_campaign(request: Request):
 
 @router.get("/campaigns")
 async def campaigns(request: Request):
-    return templates.TemplateResponse(request, "editor.html", {"page": "edit", "campaign_id": None})
+    return templates.TemplateResponse(request, "editor.html", {"page": "edit", "campaign_id": None, "prefix": get_settings().campaign_prefix})
 
 
 @router.get("/campaigns/{keitaro_id}")
 async def edit_campaign(request: Request, keitaro_id: int):
-    return templates.TemplateResponse(request, "editor.html", {"page": "edit", "campaign_id": keitaro_id})
+    return templates.TemplateResponse(request, "editor.html", {"page": "edit", "campaign_id": keitaro_id, "prefix": get_settings().campaign_prefix})

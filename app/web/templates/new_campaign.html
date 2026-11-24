@@ -18,6 +18,7 @@
           <input type="text" id="f-name" name="name" autocomplete="off" placeholder="mx_promo_1" required maxlength="180">
         </div>
         <small>The prefix is added automatically.</small>
+        <small class="field-err" id="err-name" hidden></small>
       </label>
 
       <div class="geo-row">
@@ -26,19 +27,22 @@
           <input type="text" id="f-geo" name="geo" class="geo-input" maxlength="2" placeholder="MX" autocomplete="off" required>
         </label>
         <div class="geo-name" id="geo-name">ISO-2 country code, e.g. MX, AU, RO</div>
+        <small class="field-err geo-err" id="err-geo" hidden></small>
       </div>
 
       <div class="field">
         <span id="offer-label">Offer</span>
         <div class="ac" id="offer-ac" data-label="offer-label" data-placeholder="Search by name or ID"></div>
         <small class="ac-picked" id="offer-picked">Nothing selected</small>
+        <small class="field-err" id="err-offer" hidden></small>
       </div>
 
-      <div class="row-3">
-        <label class="field" for="f-domain"><span>Domain</span><select id="f-domain" disabled><option>Loading…</option></select></label>
-        <label class="field" for="f-group"><span>Group</span><select id="f-group" disabled><option>Loading…</option></select></label>
-        <label class="field" for="f-source"><span>Traffic source</span><select id="f-source" disabled><option>Loading…</option></select></label>
-      </div>
+      <fieldset class="row-3">
+        <legend>Keitaro settings <span class="muted">· defaults from .env</span></legend>
+        <label class="field" for="f-domain"><span>Domain</span><select id="f-domain" disabled><option>Loading…</option></select><small class="field-err" id="err-domain" hidden></small></label>
+        <label class="field" for="f-group"><span>Group</span><select id="f-group" disabled><option>Loading…</option></select><small class="field-err" id="err-group" hidden></small></label>
+        <label class="field" for="f-source"><span>Traffic source</span><select id="f-source" disabled><option>Loading…</option></select><small class="field-err" id="err-source" hidden></small></label>
+      </fieldset>
 
       <div id="form-error" hidden></div>
       <div class="form-actions">
@@ -48,7 +52,7 @@
     </div>
   </form>
 
-  <div class="stack" style="display:grid;gap:20px">
+  <div class="stack">
     <section class="panel route" aria-labelledby="route-h">
       <h2 id="route-h">Streams that will be created</h2>
       <div class="route-entry">visitor → <b id="r-name">{{ prefix }}…</b></div>
